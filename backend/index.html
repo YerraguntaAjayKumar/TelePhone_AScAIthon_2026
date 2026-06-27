@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Proctoring & Student Focus Dashboard</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body { background-color: #0d1117; color: #c9d1d9; }
+        .card { background-color: #161b22; border: 1px solid #30363d; }
+    </style>
+</head>
+<body class="p-8 font-sans">
+
+    <div class="max-w-6xl mx-auto">
+        <header class="mb-8 flex justify-between items-center border-b border-gray-800 pb-4">
+            <div>
+                <h1 class="text-3xl font-extrabold text-white tracking-tight">🎓 Student Focus Analytics Node</h1>
+                <p class="text-gray-400 text-sm mt-1">Real-time attention telemetry and tracking via Afferens MCP protocol</p>
+            </div>
+            <div id="status-badge" class="px-4 py-2 rounded-full font-bold text-sm bg-yellow-600/20 text-yellow-400 border border-yellow-500/30 animate-pulse">
+                INITIALIZING
+            </div>
+        </header>
+
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            
+            <div class="lg:col-span-2 card rounded-xl p-4 flex flex-col justify-between shadow-2xl">
+                <h2 class="text-lg font-bold text-white mb-3 flex items-center gap-2">
+                    <span class="w-2 h-2 rounded-full bg-red-500 animate-ping"></span> Live Vision Monitor View
+                </h2>
+                <div class="relative bg-black rounded-lg overflow-hidden aspect-video border border-gray-800 flex items-center justify-center">
+                    <video id="webcam" autoplay playsinline class="w-full h-full object-cover transform -scale-x-100"></video>
+                </div>
+                <p class="text-xs text-gray-500 mt-3 text-center">Video pipeline runs locally through browser sandboxing to preserve system privacy.</p>
+            </div>
+
+            <div class="flex flex-col gap-6">
+                
+                <div class="card rounded-xl p-6 shadow-md">
+                    <p class="text-xs font-semibold text-gray-400 uppercase tracking-wider">Active Objects in View</p>
+                    <div id="objects-list" class="flex flex-wrap gap-2 mt-3 text-sm text-gray-300">
+                        <span class="text-gray-500 italic">Scanning space...</span>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-2 gap-4">
+                    <div class="card rounded-xl p-5 text-center">
+                        <p class="text-2xl font-black text-emerald-400 id" id="metric-study">0s</p>
+                        <p class="text-xs font-medium text-gray-400 mt-1">Focused Study Time</p>
+                    </div>
+                    <div class="card rounded-xl p-5 text-center">
+                        <p class="text-2xl font-black text-rose-400" id="metric-distracted">0s</p>
+                        <p class="text-xs font-medium text-gray-400 mt-1">Distracted Duration</p>
+                    </div>
+                </div>
+
+                <div class="card rounded-xl p-6 border-l-4 border-l-amber-500 flex items-center justify-between shadow-md">
+                    <div>
+                        <p class="text-sm font-bold text-white">Distraction Violations</p>
+                        <p class="text-xs text-gray-400 mt-0.5">Session boundary shift triggers</p>
+                    </div>
+                    <p class="text-4xl font-black text-amber-500" id="metric-incidents">0</p>
+                </div>
+
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // 1. Initialize HTML5 Local Video Media Stream Context directly inside the browser
+        const videoElement = document.getElementById('webcam');
+        navigator.mediaDevices.getUserMedia({ video: { width: 1280, height: 720 } })
+            .then(stream => { videoElement.srcObject = stream; })
+            .catch(err => { console.error("Hardware Camera Access Blocked:", err); });
+
+        // 2. Continuous Telemetry Endpoint Polling Function Matrix
+        async function fetchMetrics() {
+            try {
+                const response = await fetch('http://127.0.0.1:8000/api/telemetry');
+                const data = await response.json();
+
+                // Update Numerical Values 
+                document.getElementById('metric-study').innerText = data.study_seconds + "s";
+                document.getElementById('metric-distracted').innerText = data.distracted_seconds + "s";
+                document.getElementById('metric-incidents').innerText = data.distraction_incidents;
+
+                // Dynamic Status Badge Layout Logic
+                const badge = document.getElementById('status-badge');
+                badge.innerText = data.current_state;
+                badge.className = "px-4 py-2 rounded-full font-bold text-sm border transition-all duration-300 ";
+                
+                if (data.current_state === "STUDYING") {
+                    badge.classList.add("bg-emerald-600/20", "text-emerald-400", "border-emerald-500/30");
+                } else if (data.current_state === "DISTRACTED") {
+                    badge.classList.add("bg-rose-600/20", "text-rose-400", "border-rose-500/30");
+                } else {
+                    badge.classList.add("bg-yellow-600/20", "text-yellow-400", "border-yellow-500/30", "animate-pulse");
+                }
+
+                // Render Object Detection Label Tags Seamlessly
+                const objectsContainer = document.getElementById('objects-list');
+                if (data.detected_objects.length > 0) {
+                    objectsContainer.innerHTML = data.detected_objects.map(obj => 
+                        `<span class="px-2.5 py-1 rounded bg-gray-800 border border-gray-700 text-xs font-semibold text-gray-200 capitalize">🔍 ${obj}</span>`
+                    ).join('');
+                } else {
+                    objectsContainer.innerHTML = `<span class="text-gray-500 italic">No objects registered in view.</span>`;
+                }
+
+            } catch (err) {
+                console.error("Backend fetch error connection loss:", err);
+            }
+        }
+
+        // Run fetch metrics update routine every 1000ms
+        setInterval(fetchMetrics, 1000);
+    </script>
+</body>
+</html>
